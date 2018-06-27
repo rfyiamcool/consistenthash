@@ -5,6 +5,11 @@ import (
 	"hash/fnv"
 	"sort"
 	"strconv"
+	"sync"
+)
+
+var (
+	lock sync.RWMutex
 )
 
 type Hash func(data []byte) uint32
@@ -33,6 +38,7 @@ func (m *Map) IsEmpty() bool {
 }
 
 func (m *Map) Add(keys ...string) {
+	lock.Lock()
 	for _, key := range keys {
 		for i := 0; i < m.replicas; i++ {
 			hashCode := int(m.hash([]byte(strconv.Itoa(i) + key)))
@@ -41,6 +47,7 @@ func (m *Map) Add(keys ...string) {
 		}
 	}
 	sort.Ints(m.keys)
+	lock.Unlock()
 }
 
 func (m *Map) Get(key string) string {
@@ -60,11 +67,15 @@ func (m *Map) Get(key string) string {
 		idx = 0
 	}
 
-	return m.hashMap[m.keys[idx]]
+	lock.RLock()
+	data := m.hashMap[m.keys[idx]]
+	lock.RUnlock()
+
+	return data
 }
 
-func HashToInt(s string) int {
+func HashToInt(s string) uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(s))
-	return int(h.Sum32())
+	return uint32(h.Sum32())
 }
